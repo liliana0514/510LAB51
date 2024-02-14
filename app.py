@@ -11,8 +11,11 @@ st.title("Seattle Events Dashboard")
 # Load data from the database
 df = sqlio.read_sql_query("SELECT * FROM events", conn_str)
 df['date'] = pd.to_datetime(df['date'], utc=True)
-df['geolocation'] = df['geolocation'].apply(json.loads)
-df['weather'] = df['weather'].apply(lambda x: json.loads(x) if pd.notnull(x) else {})
+
+# Safely load geolocation and weather data, handling None values
+df['geolocation'] = df['geolocation'].apply(lambda x: json.loads(x) if x is not None else {})
+df['weather'] = df['weather'].apply(lambda x: json.loads(x) if x is not None else {})
+
 
 # Extracting month and day of the week
 df['month'] = df['date'].dt.month_name()
