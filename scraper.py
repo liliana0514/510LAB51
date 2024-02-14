@@ -63,9 +63,16 @@ def get_detail_page():
             row['venue'] = datetime_venue[1].strip()
             row['category'] = html.unescape(re.findall(r'<a href=".+?" class="button big medium black category">(.+?)</a>', res.text)[0])
             row['location'] = re.findall(r'<div class="location">(.+?)</div>', res.text)[0]
+
+            # Fetch and print geolocation data
             lat, lon = get_lat_lon(row['venue'] + ', Seattle')
-            row['geolocation'] = json.dumps({'latitude': lat, 'longitude': lon})
+            print(f"Geolocation for {row['venue']}: {lat}, {lon}")  # Debug print
+
+            # Fetch and print weather data
             weather = get_weather(lat, lon)
+            print(f"Weather for {row['venue']}: {weather}")  # Debug print
+
+            row['geolocation'] = json.dumps({'latitude': lat, 'longitude': lon})
             row['weather'] = json.dumps(weather)
             data.append(row)
         except Exception as e:
@@ -97,7 +104,8 @@ def insert_to_pg():
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (url) DO NOTHING;
         '''
-        cur.execute(q, (link, row['title'], row['date'], row['venue'], row['category'], row['location'], row['geolocation'], row['weather']))
+        # Ensure 'row['url']' is correctly defined and used here
+        cur.execute(q, (row['url'], row['title'], row['date'], row['venue'], row['category'], row['location'], row['geolocation'], row['weather']))
 
 
 if __name__ == '__main__':
