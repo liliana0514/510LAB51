@@ -103,34 +103,43 @@ def insert_to_pg():
     cur = conn.cursor()
     
     # Execute the table creation query
-    cur.execute(create_table_query)
-    
-    # Commit the changes to ensure the table is created
-    conn.commit()
+    try:
+        cur.execute(create_table_query)
+        conn.commit()
+    except Exception as e:
+        logging.error(f"Error creating table: {e}")
+        return
     
     # Load the URLs and detailed event data from the respective JSON files
-    urls = json.load(open(URL_LIST_FILE, 'r'))
-    data = json.load(open(URL_DETAIL_FILE, 'r'))
+    try:
+        data = json.load(open('./data/data.json', 'r'))
+    except Exception as e:
+        logging.error(f"Error loading data from JSON: {e}")
+        return
     
-    # Iterate over each event's URL and corresponding data
-    for url, row in zip(urls, data):
+    # Iterate over each event's data
+    for row in data:
         # SQL query to insert data into the table
         insert_query = '''
         INSERT INTO events (url, title, date, venue, category, location, longitude, latitude)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (url) DO NOTHING;
         '''
-        # Execute the insert query with data from the current row
-        cur.execute(insert_query, (url, row['title'], row['date'], row['venue'], row['category'], row['location'], row.get('longitude'), row.get('latitude')))
-    
-    # Commit the insert operations to make sure they are saved to the database
-    conn.commit()
+        try:
+            # Here, we're assuming that the URL is unique for each event. Adjust as necessary.
+            cur.execute(insert_query, (row['title'], row['title'], row['date'], row['venue'], row['category'], row['location'], row.get('longitude'), row.get('latitude')))
+            conn.commit()
+        except Exception as e:
+            logging.error(f"Error inserting data for {row['title']}: {e}")
+            # Optionally rollback if you want to maintain transaction integrity
+            # conn.rollback()
     
     # Close the cursor and connection to clean up
     cur.close()
     conn.close()
     
     logging.info("Data insertion to PostgreSQL database is complete.")
+
 
 
 if __name__ == '__main__':
