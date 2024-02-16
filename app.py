@@ -1,90 +1,81 @@
 import streamlit as st
-import pandas as pd
 import pandas.io.sql as sqlio
 import altair as alt
-import json
+import folium
+from streamlit_folium import st_folium
+import pandas as pd
 from db import conn_str
 
 # Set up the title of the dashboard
-st.title("Seattle Events Dashboard")
+st.title("Seattle Events")
 
 # Load data from the database
 df = sqlio.read_sql_query("SELECT * FROM events", conn_str)
 
-# Convert date columns to datetime and ensure timezone awareness
+# Ensure the 'date' column is in datetime format and timezone-aware
 df['date'] = pd.to_datetime(df['date'], utc=True)
 
-# Safely load JSON data for geolocation and weather columns
-df['geolocation'] = df['geolocation'].apply(lambda x: json.loads(x) if pd.notnull(x) else {})
-df['weather'] = df['weather'].apply(lambda x: json.loads(x) if pd.notnull(x) else {})
-
-# Extract month and day of week for further analysis
+# Extract 'month' and 'day_of_week' from 'date'
 df['month'] = df['date'].dt.month_name()
 df['day_of_week'] = df['date'].dt.day_name()
 
-# Sidebar Controls for filtering
-category = st.sidebar.selectbox("Select a Category", ['All'] + sorted(df['category'].unique()))
+# Sidebar controls for filtering
+# Dropdown to filter by category
+category = st.sidebar.selectbox("Select a category", ['All'] + list(df['category'].unique()))
 if category != 'All':
     df = df[df['category'] == category]
 
-start_date, end_date = st.sidebar.date_input("Select Date Range", [df['date'].min(), df['date'].max()])
-start_date_utc = pd.to_datetime(start_date).tz_localize('UTC')
-end_date_utc = pd.to_datetime(end_date).tz_localize('UTC')
-df = df[(df['date'] >= start_date_utc) & (df['date'] <= end_date_utc)]
+# Date range selector for event date
+start_date, end_date = st.sidebar.date_input("Select date range", [df['date'].min(), df['date'].max()])
+# Ensure start_date and end_date are timezone-aware to match the 'date' column in the dataframe
+start_date = pd.to_datetime(start_date).tz_localize('UTC')
+end_date = pd.to_datetime(end_date).tz_localize('UTC')
+df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
 
-location = st.sidebar.selectbox("Select a Location", ['All'] + sorted(df['location'].unique()))
+# Filter by location
+location = st.sidebar.selectbox("Select a location", ['All'] + list(df['location'].unique()))
 if location != 'All':
     df = df[df['location'] == location]
 
-weather_condition = st.sidebar.selectbox("Filter by Weather Condition", ['All'] + sorted(set([w.get('condition', 'N/A') for w in df['weather']])))
-if weather_condition != 'All':
-    df = df[df['weather'].apply(lambda x: x.get('condition', 'N/A')) == weather_condition]
+# Display the map with dynamic event locations (Optional: customize this to add dynamic markers)
+m = folium.Map(location=[47.6062, -122.3321], zoom_start=12)
+folium.Marker([47.6062, -122.3321], popup='Seattle').add_to(m)
+st_folium(m, width=800, height=400)
 
-# Charts
-# 1. Most Common Event Categories
-st.subheader("Most Common Event Categories")
-category_chart = alt.Chart(df).mark_bar().encode(
-    x='count():Q',
-    y=alt.Y('category:N', sort='-x'),
-    color='category:N',
+# Chart for Event Categories
+chart_category = alt.Chart(df).mark_bar().encode(
+    x=alt.X('count()', title='Number of Events'),
+    y=alt.Y('category', sort='-x', title='Category'),
     tooltip=['category', 'count()']
-).properties(height=400)
-st.altair_chart(category_chart, use_container_width=True)
+).properties(
+    title='Number of Events by Category'
+).interactive()
 
-# 2. Month with the Most Events
-st.subheader("Month with the Most Events")
-month_chart = alt.Chart(df).mark_bar().encode(
-    x=alt.X('month:N', sort='-y'),
-    y='count():Q',
-    color='month:N',
+st.altair_chart(chart_category, use_container_width=True)
+
+# Chart for Month with Most Events
+chart_month = alt.Chart(df).mark_bar().encode(
+    x=alt.X('month', sort='-y', title='Month'),
+    y=alt.Y('count()', title='Number of Events'),
     tooltip=['month', 'count()']
-).properties(height=400)
-st.altair_chart(month_chart, use_container_width=True)
+).properties(
+    title='Events per Month'
+).interactive()
 
-# 3. Day of the Week with the Most Events
-st.subheader("Day of the Week with the Most Events")
-day_chart = alt.Chart(df).mark_bar().encode(
-    x=alt.X('day_of_week:N', sort='-y'),
-    y='count():Q',
-    color='day_of_week:N',
+st.altair_chart(chart_month, use_container_width=True)
+
+# Chart for Day of the Week with Most Events
+chart_day_of_week = alt.Chart(df).mark_bar().encode(
+    x=alt.X('day_of_week', sort='-y', title='Day of the Week'),
+    y=alt.Y('count()', title='Number of Events'),
     tooltip=['day_of_week', 'count()']
-).properties(height=400)
-st.altair_chart(day_chart, use_container_width=True)
+).properties(
+    title='Events by Day of the Week'
+).interactive()
 
-# 4. Event Locations Visualization
-st.subheader("Event Locations")
-location_chart = alt.Chart(df).transform_calculate(
-    latitude="datum.geolocation.latitude",
-    longitude="datum.geolocation.longitude"
-).mark_circle(size=60).encode(
-    longitude='longitude:Q',
-    latitude='latitude:Q',
-    size=alt.Size('count()', title='Number of Events'),
-    color='location:N',
-    tooltip=['venue', 'location', 'count()']
-).properties(height=400)
-st.altair_chart(location_chart, use_container_width=True)
+st.altair_chart(chart_day_of_week, use_container_width=True)
 
-# Optional: Display filtered data as a table
-if st.checkbox('Show Filtered Data'):
+# Optional: Display filtered data as a table if checkbox is checked
+if st.checkbox('Show filtered data'):
     st.write(df)
+

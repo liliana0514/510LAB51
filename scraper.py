@@ -58,7 +58,7 @@ def insert_to_pg():
     conn = get_db_conn()
     cur = conn.cursor()
     cur.execute(q)
-
+    
     urls = json.load(open(URL_LIST_FILE, 'r'))
     data = json.load(open(URL_DETAIL_FILE, 'r'))
     for url, row in zip(urls, data):
