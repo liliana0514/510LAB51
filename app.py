@@ -28,7 +28,13 @@ st.title("Seattle Events")
 df = pd.read_sql_query("SELECT * FROM events", con=engine)
 
 # Ensure the 'date' column is in datetime format and timezone-aware
-df['date'] = pd.to_datetime(df['date'], utc=True)
+df['date'] = pd.to_datetime(df['date'])  # Convert to datetime format
+df['date'] = df['date'].dt.tz_convert('UTC')  # Correct way to convert existing timezone-aware datetimes to UTC
+
+# Filter out rows with NaT values in the 'date' column
+df = df.dropna(subset=['date'])
+
+# Extract month and day of the week from the 'date' column
 df['month'] = df['date'].dt.month_name()
 df['day_of_week'] = df['date'].dt.day_name()
 
@@ -37,11 +43,21 @@ category = st.sidebar.selectbox("Select a category", ['All'] + sorted(df['catego
 if category != 'All':
     df = df[df['category'] == category]
 
-start_date, end_date = st.sidebar.date_input(
-    "Select date range",
-    value=[df['date'].min(), df['date'].max()],
-    min_value=df['date'].min(),
-    max_value=df['date'].max()
+# Define a function to handle NaT values when parsing date input
+def date_input_with_nat(label, value):
+    try:
+        return st.sidebar.date_input(label, value=value)
+    except ValueError:
+        return st.sidebar.date_input(label)
+
+start_date = date_input_with_nat(
+    "Select start date",
+    value=df['date'].min()
+)
+
+end_date = date_input_with_nat(
+    "Select end date",
+    value=df['date'].max()
 )
 
 start_date = pd.to_datetime(start_date).tz_localize(None).tz_localize('UTC')
