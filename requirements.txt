@@ -3,3 +3,4 @@ requests
 python-dotenv
 streamlit-folium
 sqlalchemy
+geopy
